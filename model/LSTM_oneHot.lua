@@ -1,35 +1,37 @@
 local LSTM_oneHot = {}
 function LSTM_oneHot.lstm(input_size, rnn_size, n, dropout)
-  dropout = dropout or 0 
+  dropout = dropout or 0
 
   -- there will be 2*n+1 inputs
   local inputs = {}
   table.insert(inputs, nn.Identity()()) -- x
-  for L = 1,n do
+  for L = 1, n do
     table.insert(inputs, nn.Identity()()) -- prev_c[L]
     table.insert(inputs, nn.Identity()()) -- prev_h[L]
   end
 
   local x, input_size_L
   local outputs = {}
-  for L = 1,n do
+  for L = 1, n do
     -- c,h from previos timesteps
-    local prev_h = inputs[L*2+1]
-    local prev_c = inputs[L*2]
+    local prev_h = inputs[L * 2 + 1]
+    local prev_c = inputs[L * 2]
     -- the input to this layer
-    if L == 1 then 
-	  x = inputs[1]
-	  -- x = nn.LookupTable(input_size, embedding_size)(inputs[1])
+    if L == 1 then
+      x = inputs[1]
+      -- x = nn.LookupTable(input_size, embedding_size)(inputs[1])
       -- input_size_L = embedding_size
-	  input_size_L = input_size
-    else 
-      x = outputs[(L-1)*2] 
-      if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any
+      input_size_L = input_size
+    else
+      x = outputs[(L - 1) * 2]
+      if dropout > 0 then
+        x = nn.Dropout(dropout)(x)
+      end -- apply dropout, if any
       input_size_L = rnn_size
     end
     -- evaluate the input sums at once for efficiency
-    local i2h = nn.Linear(input_size_L, 4 * rnn_size)(x):annotate{name='i2h_'..L}
-    local h2h = nn.Linear(rnn_size, 4 * rnn_size)(prev_h):annotate{name='h2h_'..L}
+    local i2h = nn.Linear(input_size_L, 4 * rnn_size)(x):annotate {name = "i2h_" .. L}
+    local h2h = nn.Linear(rnn_size, 4 * rnn_size)(prev_h):annotate {name = "h2h_" .. L}
     local all_input_sums = nn.CAddTable()({i2h, h2h})
 
     local reshaped = nn.Reshape(4, rnn_size)(all_input_sums)
@@ -41,52 +43,55 @@ function LSTM_oneHot.lstm(input_size, rnn_size, n, dropout)
     -- decode the write inputs
     local in_transform = nn.Tanh()(n4)
     -- perform the LSTM update
-    local next_c           = nn.CAddTable()({
+    local next_c =
+      nn.CAddTable()(
+      {
         nn.CMulTable()({forget_gate, prev_c}),
-        nn.CMulTable()({in_gate,     in_transform})
-      })
+        nn.CMulTable()({in_gate, in_transform})
+      }
+    )
     -- gated cells form the output
     local next_h = nn.CMulTable()({out_gate, nn.Tanh()(next_c)})
-	
-	-- all link
-	local real_next_h = next_h
-    if L>1 then
-		-- link input to all h
-		real_next_h = nn.CAddTable()({x, next_h})
-	end
-    
+
+    -- all link
+    -- local real_next_h = next_h
+    -- if L > 1 then
+    --   -- link input to all h
+    --   real_next_h = nn.CAddTable()({x, next_h})
+    -- end
+
     table.insert(outputs, next_c)
-    table.insert(outputs, real_next_h)
+    table.insert(outputs, next_h)
   end
-  
+
   -- add out put
   local top_h = outputs[#outputs]
-  if n>2 then
-	local all_h={}
-	for L = 1,n-2 do
-		table.insert(all_h, outputs[L*2])
-	end
-	table.insert(all_h, outputs[#outputs])
+  if n > 2 then
+    local all_h = {}
+    for L = 1, n - 2 do
+      table.insert(all_h, outputs[L * 2])
+    end
+    table.insert(all_h, outputs[#outputs])
     top_h = nn.CAddTable()(all_h)
   end
 
   -- set up the decoder
   -- local top_h = outputs[#outputs]
-  if dropout > 0 then top_h = nn.Dropout(dropout)(top_h) end
-  local proj = nn.Linear(rnn_size, input_size)(top_h):annotate{name='decoder'}
+  if dropout > 0 then
+    top_h = nn.Dropout(dropout)(top_h)
+  end
+  local proj = nn.Linear(rnn_size, input_size)(top_h):annotate {name = "decoder"}
   local logsoft = nn.LogSoftMax()(proj)
   table.insert(outputs, logsoft)
 
   return nn.gModule(inputs, outputs)
 end
 
-
 -- function LSTM.init_softmaxtree(input_size)
-	-- local hierarchy = {}
-	-- local root_id = 0
-	-- local smt = nn.SoftMaxTree(input_size, hierarchy, root_id)
-	-- return smt
+-- local hierarchy = {}
+-- local root_id = 0
+-- local smt = nn.SoftMaxTree(input_size, hierarchy, root_id)
+-- return smt
 -- end
 
 return LSTM_oneHot
-
