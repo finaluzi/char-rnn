@@ -27,7 +27,7 @@ function GRU.gru(input_size, rnn_size, n, dropout)
     local prev_h = inputs[L+1]
     -- the input to this layer
     if L == 1 then 
-      x = OneHot(input_size)(inputs[1])
+      x = inputs[1]
       input_size_L = input_size
     else 
       x = outputs[(L-1)] 
@@ -47,6 +47,13 @@ function GRU.gru(input_size, rnn_size, n, dropout)
     local zh = nn.CMulTable()({update_gate, hidden_candidate})
     local zhm1 = nn.CMulTable()({nn.AddConstant(1,false)(nn.MulConstant(-1,false)(update_gate)), prev_h})
     local next_h = nn.CAddTable()({zh, zhm1})
+	
+	-- all link
+	-- local real_next_h = next_h
+    -- if L>1 then
+		-- local all_link_table = GRU.all_link_table(next_h,outputs,x,L)
+		-- real_next_h = nn.CAddTable()(all_link_table)
+    -- end
 
     table.insert(outputs, next_h)
   end
@@ -59,5 +66,14 @@ function GRU.gru(input_size, rnn_size, n, dropout)
 
   return nn.gModule(inputs, outputs)
 end
+
+-- function GRU.all_link_table(next_h,outputs,input,layer_now)
+	-- local add_table={input}
+	-- for L=1,layer_now-1 do
+		-- table.insert(add_table, outputs[L])
+	-- end
+	-- table.insert(add_table, next_h)
+	-- return add_table
+-- end
 
 return GRU

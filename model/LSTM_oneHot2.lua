@@ -1,8 +1,10 @@
-local LSTM = {}
-function LSTM.lstm(input_size, rnn_size, embedding_size, n, dropout)
+local LSTM_oneHot2 = {}
+function LSTM_oneHot2.lstm(input_size, rnn_size, n, dropout)
   dropout = dropout or 0 
 
   -- there will be 2*n+1 inputs
+  local org_outs = {}
+  
   local inputs = {}
   table.insert(inputs, nn.Identity()()) -- x
   for L = 1,n do
@@ -18,13 +20,13 @@ function LSTM.lstm(input_size, rnn_size, embedding_size, n, dropout)
     local prev_c = inputs[L*2]
     -- the input to this layer
     if L == 1 then 
-	  x = nn.LookupTable(input_size, embedding_size)(inputs[1])
-      input_size_L = embedding_size
+	  x = inputs[1]
+	  input_size_L = input_size
     else 
       x = outputs[(L-1)*2] 
+      if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any
       input_size_L = rnn_size
     end
-	if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any
     -- evaluate the input sums at once for efficiency
     local i2h = nn.Linear(input_size_L, 4 * rnn_size)(x):annotate{name='i2h_'..L}
     local h2h = nn.Linear(rnn_size, 4 * rnn_size)(prev_h):annotate{name='h2h_'..L}
@@ -45,31 +47,37 @@ function LSTM.lstm(input_size, rnn_size, embedding_size, n, dropout)
       })
     -- gated cells form the output
     local next_h = nn.CMulTable()({out_gate, nn.Tanh()(next_c)})
+	table.insert(org_outs, next_h)
 	
-	-- all link
-	local real_next_h = next_h
-    if L>1 then
-		-- link input to all h
-		real_next_h = nn.CAddTable()({x, next_h})
+	if L>2 then
+		-- print(L,#add_t)
+		local all_h={next_h}
+		if L<n then
+			table.insert(all_h, org_outs[1])
+		else
+			for LL = 1,n-2 do
+				table.insert(all_h, org_outs[LL])
+			end
+		end
+		next_h = nn.CAddTable()(all_h)
 	end
-    
+	
     table.insert(outputs, next_c)
-    table.insert(outputs, real_next_h)
+    table.insert(outputs, next_h)
   end
   
   -- add out put
-  local top_h = outputs[#outputs]
-  if n>2 then
-	local all_h={}
-	for L = 1,n-2 do
-		table.insert(all_h, outputs[L*2])
-	end
-	table.insert(all_h, outputs[#outputs])
-    top_h = nn.CAddTable()(all_h)
-  end
+  -- local top_h = outputs[#outputs]
+  -- if n>2 then
+	-- local all_h={top_h}
+	-- for L = 1,n-2 do
+		-- table.insert(all_h, outputs[L*2])
+	-- end
+    -- top_h = nn.CAddTable()(all_h)
+  -- end
 
   -- set up the decoder
-  -- local top_h = outputs[#outputs]
+  local top_h = outputs[#outputs]
   if dropout > 0 then top_h = nn.Dropout(dropout)(top_h) end
   local proj = nn.Linear(rnn_size, input_size)(top_h):annotate{name='decoder'}
   local logsoft = nn.LogSoftMax()(proj)
@@ -86,4 +94,5 @@ end
 	-- return smt
 -- end
 
-return LSTM
+return LSTM_oneHot2
+

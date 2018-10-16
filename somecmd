@@ -1,0 +1,3 @@
+nohup th train_oneHot_step.lua -data_dir data/bigtang -rnn_size 500 -num_layers 5 -seq_step 3 -dropout 0.5 -seq_length 64 -batch_size 80 -max_epochs 1000 -print_every 10 &
+./tangp2_oh.sh cv/lm_lstm_epoch2.31_5.0740.t7 5000 李白 0 101 > tangout1.txt
+nohup th train_oneHot_step.lua -data_dir data/bigtang -rnn_size 400 -num_layers 8 -seq_step 7 -dropout 0.5 -seq_length 48 -batch_size 80 -savefile tang -eval_val_every 1000 -train_frac 1 &

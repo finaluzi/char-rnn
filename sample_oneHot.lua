@@ -85,6 +85,7 @@ if not lfs.attributes(opt.model, 'mode') then
 end
 checkpoint = torch.load(opt.model)
 
+local one_hot = OneHot(checkpoint.vocab_size,1)
 protos = checkpoint.protos
 protos.rnn:evaluate() -- put in eval mode so that dropout works properly
 
@@ -111,7 +112,7 @@ state_size = #current_state
 
 -- do a few seeded timesteps
 local seed_text = opt.primetext
--- local real_x=one_hot:initOutput()
+local real_x=one_hot:initOutput()
 
 if string.len(seed_text) > 0 then
     gprint('seeding with ' .. seed_text)
@@ -122,11 +123,14 @@ if string.len(seed_text) > 0 then
         io.write(ivocab[prev_char[1]])
         if opt.gpuid >= 0 and opt.opencl == 0 then 
 			prev_char = prev_char:cuda() 
+			real_x = real_x:cuda()
 		end
         if opt.gpuid >= 0 and opt.opencl == 1 then 
 			prev_char = prev_char:cl() 
+			real_x = real_x:cl()
 		end
-        local lst = protos.rnn:forward{prev_char, unpack(current_state)}
+		one_hot:updateOutput(prev_char,real_x)
+        local lst = protos.rnn:forward{real_x, unpack(current_state)}
         -- lst is a list of [state1,state2,..stateN,output]. We want everything but last piece
         current_state = {}
         for i=1,state_size do table.insert(current_state, lst[i]) end
@@ -139,9 +143,11 @@ else
     prediction = torch.Tensor(1, #ivocab):fill(1)/(#ivocab)
     if opt.gpuid >= 0 and opt.opencl == 0 then 
 		prediction = prediction:cuda() 
+		real_x = real_x:cuda()
 	end
     if opt.gpuid >= 0 and opt.opencl == 1 then 
 		prediction = prediction:cl() 
+		real_x = real_x:cl()
 	end
 end
 
@@ -162,7 +168,8 @@ for i=1, opt.length do
     end
 
     -- forward the rnn for next character
-   local lst = protos.rnn:forward{prev_char, unpack(current_state)}
+	one_hot:updateOutput(prev_char,real_x)
+    local lst = protos.rnn:forward{real_x, unpack(current_state)}
     current_state = {}
     for i=1,state_size do table.insert(current_state, lst[i]) end
     prediction = lst[#lst] -- last element holds the log probabilities

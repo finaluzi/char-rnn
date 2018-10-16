@@ -1,7 +1,7 @@
 
 -- adapted from https://github.com/wojciechz/learning_to_execute
 -- utilities for combining/flattening parameters in a model
--- the code in this script is more general than it needs to be, which is 
+-- the code in this script is more general than it needs to be, which is
 -- why it is kind of a large
 
 require 'torch'
@@ -157,6 +157,47 @@ function model_utils.clone_many_times(net, T)
 
     mem:close()
     return clones
+end
+
+function model_utils.clone_to_index(net,name, idx, clones)
+  local params, gradParams
+  if net.parameters then
+    params, gradParams = net:parameters()
+    if params == nil then
+      params = {}
+    end
+  end
+
+  local paramsNoGrad
+  if net.parametersNoGrad then
+    paramsNoGrad = net:parametersNoGrad()
+  end
+
+  local mem = torch.MemoryFile("w"):binary()
+  mem:writeObject(net)
+
+
+  local reader = torch.MemoryFile(mem:storage(), "r"):binary()
+  local clone = reader:readObject()
+  reader:close()
+  mem:close()
+
+  if net.parameters then
+    local cloneParams, cloneGradParams = clone:parameters()
+    local cloneParamsNoGrad
+    for i = 1, #params do
+      cloneParams[i]:set(params[i])
+      cloneGradParams[i]:set(gradParams[i])
+    end
+    if paramsNoGrad then
+      cloneParamsNoGrad = clone:parametersNoGrad()
+      for i =1,#paramsNoGrad do
+        cloneParamsNoGrad[i]:set(paramsNoGrad[i])
+      end
+    end
+  end
+  clones[idx] = clone
+  collectgarbage()
 end
 
 return model_utils
