@@ -26,12 +26,12 @@ function CharSplitLMMinibatchLoader.create_data(data_dir, max_idx)
     end
     if run_prepro then
         -- construct a tensor with all the data, and vocab file
-        print("one-time setup: preprocessing input text file " .. input_file .. "...")
         local tensor_list = {}
         local vocab_map = {}
         for idx = 1, max_idx, 1 do
             local input_file_num = "input" .. tostring(idx) .. ".txt"
             local input_file = path.join(data_dir, input_file_num)
+            print("one-time setup: preprocessing input text file " .. input_file .. "...")
             CharSplitLMMinibatchLoader.text_to_tensor(input_file, vocab_map, tensor_list)
         end
         print("saving " .. vocab_file)
