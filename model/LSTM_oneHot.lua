@@ -54,14 +54,14 @@ function LSTM_oneHot.lstm(input_size, rnn_size, n, dropout)
     local next_h = nn.CMulTable()({out_gate, nn.Tanh()(next_c)})
 
     -- all link
-    -- local real_next_h = next_h
-    -- if L > 1 then
-    --   -- link input to all h
-    --   real_next_h = nn.CAddTable()({x, next_h})
-    -- end
+    local real_next_h = next_h
+    if L > 1 then
+      -- link input to all h
+      real_next_h = nn.CAddTable()({x, next_h})
+    end
 
     table.insert(outputs, next_c)
-    table.insert(outputs, next_h)
+    table.insert(outputs, real_next_h)
   end
 
   -- add out put
