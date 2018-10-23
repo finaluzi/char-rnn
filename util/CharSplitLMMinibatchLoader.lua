@@ -4,41 +4,59 @@
 local CharSplitLMMinibatchLoader = {}
 CharSplitLMMinibatchLoader.__index = CharSplitLMMinibatchLoader
 
-function CharSplitLMMinibatchLoader.create(data_dir, batch_size, seq_length, split_fractions)
-    -- split_fractions is e.g. {0.9, 0.05, 0.05}
-
-    local self = {}
-    setmetatable(self, CharSplitLMMinibatchLoader)
-
-    local input_file = path.join(data_dir, "input.txt")
+function CharSplitLMMinibatchLoader.create_data(data_dir, max_idx)
     local vocab_file = path.join(data_dir, "vocab.t7")
     local tensor_file = path.join(data_dir, "data.t7")
-
-    -- fetch file attributes to determine if we need to rerun preprocessing
     local run_prepro = false
     if not (path.exists(vocab_file) or path.exists(tensor_file)) then
         -- prepro files do not exist, generate them
         print("vocab.t7 and data.t7 do not exist. Running preprocessing...")
         run_prepro = true
-    else
-        -- check if the input file was modified since last time we
-        -- ran the prepro. if so, we have to rerun the preprocessing
-        local input_attr = lfs.attributes(input_file)
-        local vocab_attr = lfs.attributes(vocab_file)
-        local tensor_attr = lfs.attributes(tensor_file)
-        if input_attr.modification > vocab_attr.modification or input_attr.modification > tensor_attr.modification then
-            print("vocab.t7 or data.t7 detected as stale. Re-running preprocessing...")
-            run_prepro = true
-        end
+    -- else
+    -- check if the input file was modified since last time we
+    -- ran the prepro. if so, we have to rerun the preprocessing
+    -- local input_attr = lfs.attributes(input_file)
+    -- local vocab_attr = lfs.attributes(vocab_file)
+    -- local tensor_attr = lfs.attributes(tensor_file)
+    -- if input_attr.modification > vocab_attr.modification or input_attr.modification > tensor_attr.modification then
+    --     print("vocab.t7 or data.t7 detected as stale. Re-running preprocessing...")
+    --     run_prepro = true
+    -- end
+    -- this thing what ever
     end
     if run_prepro then
         -- construct a tensor with all the data, and vocab file
         print("one-time setup: preprocessing input text file " .. input_file .. "...")
-        CharSplitLMMinibatchLoader.text_to_tensor(input_file, vocab_file, tensor_file)
+        local tensor_list = {}
+        local vocab_map = {}
+        for idx = 1, max_idx, 1 do
+            local input_file_num = "input" .. tostring(idx) .. ".txt"
+            local input_file = path.join(data_dir, input_file_num)
+            CharSplitLMMinibatchLoader.text_to_tensor(input_file, vocab_map, tensor_list)
+        end
+        print("saving " .. vocab_file)
+        torch.save(vocab_file, vocab_map)
+        -- save output preprocessed files
+        print("saving " .. tensor_file)
+        torch.save(tensor_file, tensor_list)
     end
+end
+
+function CharSplitLMMinibatchLoader.create_batch(
+    data_dir,
+    batch_size,
+    seq_length,
+    split_fractions,
+    file_idx)
+    -- split_fractions is e.g. {0.9, 0.05, 0.05}
+    local self = {}
+    setmetatable(self, CharSplitLMMinibatchLoader)
+
+    local vocab_file = path.join(data_dir, "vocab.t7")
+    local tensor_file = path.join(data_dir, "data.t7")
 
     print("loading data files...")
-    local data = torch.load(tensor_file)
+    local data = torch.load(tensor_file)[file_idx]
     self.vocab_mapping = torch.load(vocab_file)
 
     -- cut off the end so that it divides evenly
@@ -142,142 +160,38 @@ function CharSplitLMMinibatchLoader:next_batch(split_index)
     return self.x_batches[ix], self.y_batches[ix]
 end
 
-function read_utf8_char(file)
-    local c1 = file:read(1)
-    local ctr, c = -1, math.max(c1:byte(), 128)
-    repeat
-        ctr = ctr + 1
-        c = (c - 128) * 2
-    until c < 128
-    return c1 .. file:read(ctr)
-end
-
--- *** STATIC method ***
-function CharSplitLMMinibatchLoader.text_to_tensor_old(in_textfile, out_vocabfile, out_tensorfile)
-    local has_vocab = path.exists(out_vocabfile)
-
+function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile_path, vocab_mapping, tensor_data)
     local timer = torch.Timer()
 
     print("loading text file...")
-    local cache_len = 1
-    local rawdata
-    local tot_len = 0
-    f = io.open(in_textfile, "r")
-
-    local vocab_mapping = {}
-
-    if not (has_vocab) then
-        local unordered = {}
-        -- create vocabulary if it doesn't exist yet
-        print("creating vocabulary mapping...")
-        -- record all characters to a set
-
-        rawdata = f:read(cache_len)
-        repeat
-            for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-                if not unordered[char] then
-                    unordered[char] = true
-                -- print ('heyyyyy ' .. char)
-                end
-                tot_len = tot_len + 1
-            end
-            rawdata = f:read(cache_len)
-        until not rawdata
-        -- f:close()
-        -- sort into a table (i.e. keys become 1..N)
-        local ordered = {}
-        for char in pairs(unordered) do
-            ordered[#ordered + 1] = char
-        end
-        table.sort(ordered)
-        -- invert `ordered` to create the char->int mapping
-
-        for i, char in ipairs(ordered) do
-            vocab_mapping[char] = i
-        end
-        -- vocab_mapping["tot_len"] = tot_len
-        -- save output preprocessed files
-        print("saving " .. out_vocabfile)
-        torch.save(out_vocabfile, vocab_mapping)
-    else
-        -- tot_len = vocab_mapping["tot_len"]
-        print("!!!reading vocab_mapping...")
-        vocab_mapping = torch.load(out_vocabfile)
-        rawdata = f:read(cache_len)
-        repeat
-            for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-                -- if not unordered[char] then unordered[char] = true end
-                tot_len = tot_len + 1
-            end
-            rawdata = f:read(cache_len)
-        until not rawdata
-    end
-    f:close()
-
-    -- construct a tensor with all the data
-    print("putting data into tensor...")
-    -- local data = torch.ByteTensor(tot_len) -- store it into 1D first, then rearrange
-    f = io.open(in_textfile, "r")
-    local pos = 1
-    rawdata = f:read(cache_len)
-
-    local data = torch.ShortTensor(tot_len) -- store it into 1D first, then rearrange
-    -- print ('heyyyyy ' .. tot_len)
-    repeat
-        for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-            -- print ('heyyyyy ' .. char .. vocab_mapping[char])
-            data[pos] = vocab_mapping[char]
-            pos = pos + 1
-        end
-        rawdata = f:read(cache_len)
-    until not rawdata
-    f:close()
-
-    print("saving " .. out_tensorfile)
-    torch.save(out_tensorfile, data)
-end
-
-function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, out_tensorfile)
-    local has_vocab = path.exists(out_vocabfile)
-    local timer = torch.Timer()
-
-    print("loading text file...")
-    local f = torch.DiskFile(in_textfile)
+    local f = torch.DiskFile(in_textfile_path)
     local rawdata = f:readString("*a") -- NOTE: this reads the whole file at once
     f:close()
-    local vocab_mapping = {}
     local len = 0
+    for _ in pairs(vocab_mapping) do
+        len = len + 1
+    end
 
-    if not (has_vocab) then
-        -- create vocabulary if it doesn't exist yet
-        print("creating vocabulary mapping...")
-        -- record all characters to a set
-        local unordered = {}
-        -- code snippets taken from http://lua-users.org/wiki/LuaUnicode
-        for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-            if not unordered[char] then
-                unordered[char] = true
-            end
-            len = len + 1
+    -- create vocabulary if it doesn't exist yet
+    print("creating vocabulary mapping...")
+    -- record all characters to a set
+    local unordered = {}
+    -- code snippets taken from http://lua-users.org/wiki/LuaUnicode
+    for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
+        if not unordered[char] then
+            unordered[char] = true
         end
-        -- sort into a table (i.e. keys become 1..N)
-        local ordered = {}
-        for char in pairs(unordered) do
-            ordered[#ordered + 1] = char
-        end
-        table.sort(ordered)
-        -- invert `ordered` to create the char->int mapping
-        for i, char in ipairs(ordered) do
-            vocab_mapping[char] = i
-        end
-        print("saving " .. out_vocabfile)
-        torch.save(out_vocabfile, vocab_mapping)
-    else
-        print("!!!reading vocab_mapping...")
-        vocab_mapping = torch.load(out_vocabfile)
-        for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-            len = len + 1
-        end
+        len = len + 1
+    end
+    -- sort into a table (i.e. keys become 1..N)
+    local ordered = {}
+    for char in pairs(unordered) do
+        ordered[#ordered + 1] = char
+    end
+    table.sort(ordered)
+    -- invert `ordered` to create the char->int mapping
+    for i, char in ipairs(ordered) do
+        vocab_mapping[char] = i
     end
     -- construct a tensor with all the data
     print("putting data into tensor...")
@@ -287,10 +201,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
         data[pos] = vocab_mapping[char]
         pos = pos + 1
     end
-
-    -- save output preprocessed files
-    print("saving " .. out_tensorfile)
-    torch.save(out_tensorfile, data)
+    tensor_data[#tensor_data + 1] = data
 end
 
 return CharSplitLMMinibatchLoader

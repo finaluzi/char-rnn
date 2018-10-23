@@ -69,6 +69,8 @@ cmd:option(
 )
 -- GPU/CPU
 cmd:option("-gpuid", 0, "which gpu to use. -1 = use CPU")
+cmd:option("-inputs", 1, "input1.txt, input2.txt")
+cmd:option("-train_input", 1, "train input1.txt")
 cmd:text()
 
 -- parse input params
@@ -101,7 +103,9 @@ if opt.gpuid >= 0 then
 end
 
 -- create the data loader class
-local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes)
+CharSplitLMMinibatchLoader.create_data(opt.data_dir, opt.inputs)
+local loader =
+    CharSplitLMMinibatchLoader.create_batch(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes, opt.train_input)
 local vocab_size = loader.vocab_size -- the number of distinct characters
 local vocab = loader.vocab_mapping
 print("vocab size: " .. vocab_size)
