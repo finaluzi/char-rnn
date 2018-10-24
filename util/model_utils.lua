@@ -1,15 +1,12 @@
-
 -- adapted from https://github.com/wojciechz/learning_to_execute
 -- utilities for combining/flattening parameters in a model
 -- the code in this script is more general than it needs to be, which is
 -- why it is kind of a large
 
-require 'torch'
+require "torch"
 local model_utils = {}
-function model_utils.combine_all_parameters(...)
-    --[[ like module:getParameters, but operates on many modules ]]--
-
-    -- get parameters
+function model_utils.combine_all_parameters(...) --
+    --[[ like module:getParameters, but operates on many modules ]] -- get parameters
     local networks = {...}
     local parameters = {}
     local gradParameters = {}
@@ -45,7 +42,7 @@ function model_utils.combine_all_parameters(...)
 
         local storages = {}
         local nParameters = 0
-        for k = 1,#parameters do
+        for k = 1, #parameters do
             local storage = parameters[k]:storage()
             if not storageInSet(storages, storage) then
                 storages[torch.pointer(storage)] = {storage, nParameters}
@@ -56,45 +53,49 @@ function model_utils.combine_all_parameters(...)
         local flatParameters = Tensor(nParameters):fill(1)
         local flatStorage = flatParameters:storage()
 
-        for k = 1,#parameters do
+        for k = 1, #parameters do
             local storageOffset = storageInSet(storages, parameters[k]:storage())
-            parameters[k]:set(flatStorage,
+            parameters[k]:set(
+                flatStorage,
                 storageOffset + parameters[k]:storageOffset(),
                 parameters[k]:size(),
-                parameters[k]:stride())
+                parameters[k]:stride()
+            )
             parameters[k]:zero()
         end
 
-        local maskParameters=  flatParameters:float():clone()
+        local maskParameters = flatParameters:float():clone()
         local cumSumOfHoles = flatParameters:float():cumsum(1)
         local nUsedParameters = nParameters - cumSumOfHoles[#cumSumOfHoles]
         local flatUsedParameters = Tensor(nUsedParameters)
         local flatUsedStorage = flatUsedParameters:storage()
 
-        for k = 1,#parameters do
+        for k = 1, #parameters do
             local offset = cumSumOfHoles[parameters[k]:storageOffset()]
-            parameters[k]:set(flatUsedStorage,
+            parameters[k]:set(
+                flatUsedStorage,
                 parameters[k]:storageOffset() - offset,
                 parameters[k]:size(),
-                parameters[k]:stride())
+                parameters[k]:stride()
+            )
         end
 
         for _, storageAndOffset in pairs(storages) do
             local k, v = unpack(storageAndOffset)
-            flatParameters[{{v+1,v+k:size()}}]:copy(Tensor():set(k))
+            flatParameters[{{v + 1, v + k:size()}}]:copy(Tensor():set(k))
         end
 
         if cumSumOfHoles:sum() == 0 then
             flatUsedParameters:copy(flatParameters)
         else
             local counter = 0
-            for k = 1,flatParameters:nElement() do
+            for k = 1, flatParameters:nElement() do
                 if maskParameters[k] == 0 then
                     counter = counter + 1
-                    flatUsedParameters[counter] = flatParameters[counter+cumSumOfHoles[k]]
+                    flatUsedParameters[counter] = flatParameters[counter + cumSumOfHoles[k]]
                 end
             end
-            assert (counter == nUsedParameters)
+            assert(counter == nUsedParameters)
         end
         return flatUsedParameters
     end
@@ -106,9 +107,6 @@ function model_utils.combine_all_parameters(...)
     -- return new flat vector that contains all discrete parameters
     return flatParameters, flatGradParameters
 end
-
-
-
 
 function model_utils.clone_many_times(net, T)
     local clones = {}
@@ -145,7 +143,7 @@ function model_utils.clone_many_times(net, T)
             end
             if paramsNoGrad then
                 cloneParamsNoGrad = clone:parametersNoGrad()
-                for i =1,#paramsNoGrad do
+                for i = 1, #paramsNoGrad do
                     cloneParamsNoGrad[i]:set(paramsNoGrad[i])
                 end
             end
@@ -159,45 +157,44 @@ function model_utils.clone_many_times(net, T)
     return clones
 end
 
-function model_utils.clone_to_index(net,name, idx, clones)
-  local params, gradParams
-  if net.parameters then
-    params, gradParams = net:parameters()
-    if params == nil then
-      params = {}
+function model_utils.clone_to_index(net, name, idx, clones)
+    local params, gradParams
+    if net.parameters then
+        params, gradParams = net:parameters()
+        if params == nil then
+            params = {}
+        end
     end
-  end
 
-  local paramsNoGrad
-  if net.parametersNoGrad then
-    paramsNoGrad = net:parametersNoGrad()
-  end
-
-  local mem = torch.MemoryFile("w"):binary()
-  mem:writeObject(net)
-
-
-  local reader = torch.MemoryFile(mem:storage(), "r"):binary()
-  local clone = reader:readObject()
-  reader:close()
-  mem:close()
-
-  if net.parameters then
-    local cloneParams, cloneGradParams = clone:parameters()
-    local cloneParamsNoGrad
-    for i = 1, #params do
-      cloneParams[i]:set(params[i])
-      cloneGradParams[i]:set(gradParams[i])
+    local paramsNoGrad
+    if net.parametersNoGrad then
+        paramsNoGrad = net:parametersNoGrad()
     end
-    if paramsNoGrad then
-      cloneParamsNoGrad = clone:parametersNoGrad()
-      for i =1,#paramsNoGrad do
-        cloneParamsNoGrad[i]:set(paramsNoGrad[i])
-      end
+
+    local mem = torch.MemoryFile("w"):binary()
+    mem:writeObject(net)
+
+    local reader = torch.MemoryFile(mem:storage(), "r"):binary()
+    local clone = reader:readObject()
+    reader:close()
+    mem:close()
+
+    if net.parameters then
+        local cloneParams, cloneGradParams = clone:parameters()
+        local cloneParamsNoGrad
+        for i = 1, #params do
+            cloneParams[i]:set(params[i])
+            cloneGradParams[i]:set(gradParams[i])
+        end
+        if paramsNoGrad then
+            cloneParamsNoGrad = clone:parametersNoGrad()
+            for i = 1, #paramsNoGrad do
+                cloneParamsNoGrad[i]:set(paramsNoGrad[i])
+            end
+        end
     end
-  end
-  clones[idx] = clone
-  collectgarbage()
+    clones[idx] = clone
+    collectgarbage()
 end
 
 return model_utils

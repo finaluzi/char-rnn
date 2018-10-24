@@ -71,6 +71,7 @@ cmd:option(
 cmd:option("-gpuid", 0, "which gpu to use. -1 = use CPU")
 cmd:option("-inputs", 1, "input1.txt, input2.txt")
 cmd:option("-train_input", 1, "train input1.txt")
+cmd:option("-fine_tune", 0, "turn off grad")
 cmd:text()
 
 -- parse input params
@@ -148,6 +149,18 @@ if string.len(opt.init_from) > 0 then
     opt.rnn_size = checkpoint.opt.rnn_size
     opt.num_layers = checkpoint.opt.num_layers
     do_random_init = false
+
+	-- fine_tune!
+    if opt.fine_tune > 0 then
+        local function dummyAccGradParameters()
+        end
+		print(protos.rnn:get(1).accGradParameters)
+		for i = 1, protos.rnn:size(1) - opt.fine_tune do
+			print(string.format("%d: %s", i, protos.rnn.modules[i]))
+			protos.rnn:get(i).accGradParameters = dummyAccGradParameters
+		end
+        
+    end
 else
     print("creating an " .. opt.model .. " with " .. opt.num_layers .. " layers")
     protos = {}
