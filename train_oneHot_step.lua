@@ -71,7 +71,8 @@ cmd:option(
 cmd:option("-gpuid", 0, "which gpu to use. -1 = use CPU")
 cmd:option("-inputs", 1, "input1.txt, input2.txt")
 cmd:option("-train_input", 1, "train input1.txt")
-cmd:option("-fine_tune", 3, "turn off grad, >0 emb, <0 dec")
+cmd:option("-fine_tune_start", 3, "turn off grad,  emb")
+cmd:option("-fine_tune_end", 3, "turn off grad,  dec")
 cmd:text()
 
 -- parse input params
@@ -159,16 +160,17 @@ if string.len(opt.init_from) > 0 then
     end
     local function dummyAccGradParameters()
     end
-    if opt.fine_tune > 0 then
+    if opt.fine_tune_start > 0 then
         print(protos.rnn:get(1).accGradParameters)
-        for i = 1, protos.rnn:size(1) - opt.fine_tune do
+        for i = 1, protos.rnn:size(1) - opt.fine_tune_start do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
             protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
         end
-    elseif opt.fine_tune < 0 then
+    end
+    if opt.fine_tune_start_end > 0 then
         print(protos.rnn:get(1).accGradParameters)
-        for i = protos.rnn:size(1) + 1 + opt.fine_tune, protos.rnn:size(1) do
+        for i = protos.rnn:size(1) + 1 - opt.fine_tune_start_end, protos.rnn:size(1) do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
             protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
