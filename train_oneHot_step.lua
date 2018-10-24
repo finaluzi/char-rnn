@@ -151,20 +151,26 @@ if string.len(opt.init_from) > 0 then
     do_random_init = false
 
     -- fine_tune!
-    if opt.fine_tune > 0 then
-        local function dummyAccGradParameters()
+    for i = 1, protos.rnn:size(1) do
+        if protos.rnn:get(i).accGradParametersOrg then
+            protos.rnn:get(i).accGradParameters = protos.rnn:get(i).accGradParametersOrg
+            protos.rnn:get(i).accGradParametersOrg = nil
         end
+    end
+    local function dummyAccGradParameters()
+    end
+    if opt.fine_tune > 0 then
         print(protos.rnn:get(1).accGradParameters)
         for i = 1, protos.rnn:size(1) - opt.fine_tune do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
+            protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
         end
     elseif opt.fine_tune < 0 then
-        local function dummyAccGradParameters()
-        end
         print(protos.rnn:get(1).accGradParameters)
         for i = protos.rnn:size(1) + 1 + opt.fine_tune, protos.rnn:size(1) do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
+            protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
         end
     end
