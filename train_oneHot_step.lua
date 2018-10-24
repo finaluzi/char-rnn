@@ -162,7 +162,14 @@ if string.len(opt.init_from) > 0 then
     end
     if opt.fine_tune_start > 0 then
         print(protos.rnn:get(1).accGradParameters)
-        for i = 1, protos.rnn:size(1) - opt.fine_tune_start do
+        for i = 1, opt.fine_tune_start do
+            print(string.format("%d: %s", i, protos.rnn.modules[i]))
+            protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
+            protos.rnn:get(i).accGradParameters = dummyAccGradParameters
+        end
+    elseif opt.fine_tune_start < 0 then
+        print(protos.rnn:get(1).accGradParameters)
+        for i = 1, protos.rnn:size(1) + opt.fine_tune_start do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
             protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
@@ -170,7 +177,14 @@ if string.len(opt.init_from) > 0 then
     end
     if opt.fine_tune_start_end > 0 then
         print(protos.rnn:get(1).accGradParameters)
-        for i = protos.rnn:size(1) + 1 - opt.fine_tune_start_end, protos.rnn:size(1) do
+        for i = opt.fine_tune_start_end + 1, protos.rnn:size(1) do
+            print(string.format("%d: %s", i, protos.rnn.modules[i]))
+            protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
+            protos.rnn:get(i).accGradParameters = dummyAccGradParameters
+        end
+    elseif opt.fine_tune_start_end < 0 then
+        print(protos.rnn:get(1).accGradParameters)
+        for i = protos.rnn:size(1) + 1 + opt.fine_tune_start_end, protos.rnn:size(1) do
             print(string.format("%d: %s", i, protos.rnn.modules[i]))
             protos.rnn:get(i).accGradParametersOrg = protos.rnn:get(i).accGradParameters
             protos.rnn:get(i).accGradParameters = dummyAccGradParameters
