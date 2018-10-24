@@ -42,12 +42,7 @@ function CharSplitLMMinibatchLoader.create_data(data_dir, max_idx)
     end
 end
 
-function CharSplitLMMinibatchLoader.create_batch(
-    data_dir,
-    batch_size,
-    seq_length,
-    split_fractions,
-    file_idx)
+function CharSplitLMMinibatchLoader.create_batch(data_dir, batch_size, seq_length, split_fractions, file_idx)
     -- split_fractions is e.g. {0.9, 0.05, 0.05}
     local self = {}
     setmetatable(self, CharSplitLMMinibatchLoader)
@@ -168,8 +163,9 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile_path, vocab_mappi
     local rawdata = f:readString("*a") -- NOTE: this reads the whole file at once
     f:close()
     local len = 0
+    local vocab_len = 0
     for _ in pairs(vocab_mapping) do
-        len = len + 1
+        vocab_len = vocab_len + 1
     end
 
     -- create vocabulary if it doesn't exist yet
@@ -178,7 +174,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile_path, vocab_mappi
     local unordered = {}
     -- code snippets taken from http://lua-users.org/wiki/LuaUnicode
     for char in string.gfind(rawdata, "([%z\1-\127\194-\244][\128-\191]*)") do
-        if not unordered[char] then
+        if not unordered[char] and not vocab_mapping[char] then
             unordered[char] = true
         end
         len = len + 1
@@ -191,7 +187,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile_path, vocab_mappi
     table.sort(ordered)
     -- invert `ordered` to create the char->int mapping
     for i, char in ipairs(ordered) do
-        vocab_mapping[char] = i
+        vocab_mapping[char] = i + vocab_len
     end
     -- construct a tensor with all the data
     print("putting data into tensor...")
