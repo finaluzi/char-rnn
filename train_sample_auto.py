@@ -1,6 +1,5 @@
 import random
 import subprocess
-import sys
 
 __author__ = 'uzi'
 
@@ -19,6 +18,16 @@ def exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout, seq_length, bat
     # print(fine_tune_start)
 
 
+def exec_sample(savefile, current, loop_idx, max_epochs):
+    # bash ./tangp2_oh.sh cv/lm_mix800_42_epoch43.16_nan.t7 15000 李白 0 101 > tangshitmix1.txt
+    check_file = 'cv/lm_'+savefile+'_' + \
+        str(current) + '_'+str(loop_idx)+'_epoch' + \
+        str(max_epochs)+'.00_nan.t7'
+    command = 'nohup bash ./tangp2_oh.sh '+check_file + \
+        ' 5000 李白 0 101 > '+check_file+'.txt &'
+    subprocess.run(command, shell=True, universal_newlines=True, check=True)
+
+
 def get_fine_tune_start(all_layer, fine_tune_end):
     return random.randint(0, all_layer+fine_tune_end)
 
@@ -34,8 +43,8 @@ def get_fine_tune_end(fine_tune_end):
 
 
 if __name__ == '__main__':
-    all_layer = int(sys.argv[1])
-    data_dir = 'mix5'
+    all_layer = 75
+    data_dir = 'mix3'
     rnn_size = 800
     num_layers = 4
     seq_step = 3
@@ -55,10 +64,13 @@ if __name__ == '__main__':
     loop = 1000
     for i in range(loop):
         max_epochs = random.randint(3, 9)
+        # max_epochs = 1
         current_idx = get_train_idx(inputs)
+        # current_idx = 3
         print('loop:', str(i), '/', str(loop))
         exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
                   seq_length, batch_list[current_idx - 1], max_epochs,
                   last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer, fine_tune_end), fine_tune_end, i+1)
+        exec_sample(savefile, current_idx, i+1, max_epochs)
         last_idx = current_idx
         last_max_epochs = max_epochs
