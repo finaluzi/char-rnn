@@ -23,23 +23,31 @@ def exec_sample(savefile, current, loop_idx, max_epochs):
     check_file = 'cv/lm_'+savefile+'_' + \
         str(current) + '_'+str(loop_idx)+'_epoch' + \
         str(max_epochs)+'.00_nan.t7'
-    command = 'nohup bash ./tangp2_oh.sh '+check_file + \
-        ' 5000 李白 0 101 > '+check_file+'.txt &'
+    command = 'bash ./tangp2_oh.sh '+check_file + \
+        ' 5000 李白 0 101 >> '+savefile+'.txt'
     subprocess.run(command, shell=True, universal_newlines=True, check=True)
 
 
-def get_fine_tune_start(all_layer, fine_tune_end):
-    return random.randint(0, all_layer+fine_tune_end)
+def exec_remove(savefile, last, loop_idx_1, last_max_epochs):
+        # bash ./tangp2_oh.sh cv/lm_mix800_42_epoch43.16_nan.t7 15000 李白 0 101 > tangshitmix1.txt
+    check_file = 'cv/lm_'+savefile+'_' + \
+        str(last) + '_'+str(loop_idx_1)+'_epoch' + \
+        str(last_max_epochs)+'.00_nan.t7'
+    command = 'rm '+check_file
+    subprocess.run(command, shell=True, universal_newlines=True, check=True)
+
+
+def get_fine_tune_start(all_layer):
+    return random.randint(0, round(float(all_layer)/2.0))
 
 
 def get_train_idx(inputs):
     return random.randint(1, inputs)
 
 
-def get_fine_tune_end(fine_tune_end):
-    if random.random() > 0.8:
-        return fine_tune_end
-    return 0
+def get_fine_tune_end(all_layer):
+    #  // floor division.
+    return -random.randint(0, all_layer//2)
 
 
 if __name__ == '__main__':
@@ -51,12 +59,12 @@ if __name__ == '__main__':
     dropout = 0.5
     seq_length = 100
     max_epochs = 10
+    batch_list = [48, 48, 1, 4, 48]
     savefile = data_dir+'_'+str(rnn_size)
-    inputs = 5
-    fine_tune_end = -3
+    inputs = len(batch_list)
+    # fine_tune_end = -3
     last_max_epochs = max_epochs
     current_idx = 1
-    batch_list = [48, 48, 1, 4, 48]
     last_idx = current_idx
 
     exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
@@ -70,7 +78,8 @@ if __name__ == '__main__':
         print('loop:', str(i), '/', str(loop))
         exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
                   seq_length, batch_list[current_idx - 1], max_epochs,
-                  last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer, fine_tune_end), fine_tune_end, i+1)
+                  last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer), get_fine_tune_end(all_layer), i+1)
+        exec_remove(savefile, last_idx, i, last_max_epochs)
         exec_sample(savefile, current_idx, i+1, max_epochs)
         last_idx = current_idx
         last_max_epochs = max_epochs
