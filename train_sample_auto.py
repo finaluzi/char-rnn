@@ -15,21 +15,18 @@ def exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout, seq_length, bat
         cmd_list.extend(['-init_from', 'cv/lm_'+savefile+'_'+str(last) + '_'+str(loop_idx-1) +
                          '_epoch'+str(last_max_epochs)+'.00_nan.t7', '-fine_tune_start', str(fine_tune_start), '-fine_tune_end', str(fine_tune_end)])
     subprocess.call(cmd_list)
-    # print(fine_tune_start)
 
 
 def exec_sample(savefile, current, loop_idx, max_epochs):
-    # bash ./tangp2_oh.sh cv/lm_mix800_42_epoch43.16_nan.t7 15000 李白 0 101 > tangshitmix1.txt
     check_file = 'cv/lm_'+savefile+'_' + \
         str(current) + '_'+str(loop_idx)+'_epoch' + \
         str(max_epochs)+'.00_nan.t7'
     command = 'bash ./tangp2_oh.sh '+check_file + \
-        ' 5000 李白 0 101 >> '+savefile+'.txt'
+        ' 5000 李白 0 101 >> '+'output/'+savefile+'.txt'
     subprocess.run(command, shell=True, universal_newlines=True, check=True)
 
 
 def exec_remove(savefile, last, loop_idx_1, last_max_epochs):
-        # bash ./tangp2_oh.sh cv/lm_mix800_42_epoch43.16_nan.t7 15000 李白 0 101 > tangshitmix1.txt
     check_file = 'cv/lm_'+savefile+'_' + \
         str(last) + '_'+str(loop_idx_1)+'_epoch' + \
         str(last_max_epochs)+'.00_nan.t7'
@@ -58,24 +55,21 @@ if __name__ == '__main__':
     seq_step = 3
     dropout = 0.5
     seq_length = 100
-    max_epochs = 10
+    max_epochs = 3
     batch_list = [48, 48, 1, 4, 48]
     savefile = data_dir+'_'+str(rnn_size)
     inputs = len(batch_list)
-    # fine_tune_end = -3
     last_max_epochs = max_epochs
     current_idx = 1
     last_idx = current_idx
 
     exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
               seq_length, batch_list[current_idx-1], max_epochs, 0, savefile, inputs, current_idx, 0, 0, 0, 0)
-    loop = 1000
-    for i in range(loop):
-        max_epochs = random.randint(3, 9)
-        # max_epochs = 1
+    i = 0
+    while True:
+        max_epochs = random.randint(1, 3)
         current_idx = get_train_idx(inputs)
-        # current_idx = 3
-        print('loop:', str(i), '/', str(loop))
+        print('loop:', str(i), '/inf')
         exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
                   seq_length, batch_list[current_idx - 1], max_epochs,
                   last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer), get_fine_tune_end(all_layer), i+1)
@@ -83,3 +77,4 @@ if __name__ == '__main__':
         exec_sample(savefile, current_idx, i+1, max_epochs)
         last_idx = current_idx
         last_max_epochs = max_epochs
+        i += 1
