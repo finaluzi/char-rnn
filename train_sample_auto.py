@@ -64,10 +64,10 @@ if __name__ == '__main__':
     savefile = data_dir+'_'+str(rnn_size)
     inputs = len(batch_list)
     last_max_epochs = max_epochs
-    current_idx = 8
+    current_idx = 1
     last_idx = current_idx
     # [0,1,2,3...]
-    round_idx_list = range(inputs)
+    round_idx_list = list(range(inputs))
 
     exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
               seq_length, batch_list[current_idx-1], max_epochs, 0, savefile, inputs, current_idx, 0, 0, 0, 0)
