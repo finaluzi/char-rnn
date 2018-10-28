@@ -34,45 +34,54 @@ def exec_remove(savefile, last, loop_idx_1, last_max_epochs):
     subprocess.run(command, shell=True, universal_newlines=True, check=True)
 
 
-def get_fine_tune_start(all_layer):
-    return random.randint(0, round(float(all_layer)/2.0))
+def get_fine_tune_start(all_layer, fine_tune_end):
+    return random.randint(0, all_layer+fine_tune_end)
 
 
 def get_train_idx(inputs):
     return random.randint(1, inputs)
 
 
-def get_fine_tune_end(all_layer):
+def get_fine_tune_end(fine_tune_end, fine_tune_end_rnd):
     #  // floor division.
-    return -random.randint(0, all_layer//2)
+    if random.random() < fine_tune_end_rnd:
+        return 0
+    return fine_tune_end
 
 
 if __name__ == '__main__':
-    all_layer = 75
-    data_dir = 'mix3'
+    all_layer = 93
+    data_dir = 'mix9'
     rnn_size = 800
-    num_layers = 4
+    num_layers = 5
     seq_step = 3
     dropout = 0.5
     seq_length = 100
-    max_epochs = 3
-    batch_list = [48, 48, 1, 4, 48]
+    fine_tune_end = -3
+    fine_tune_end_rnd = 0.1
+    max_epochs = 9
+    batch_list = [48, 48, 1, 4, 48, 8, 48, 48, 24]
     savefile = data_dir+'_'+str(rnn_size)
     inputs = len(batch_list)
     last_max_epochs = max_epochs
-    current_idx = 1
+    current_idx = 8
     last_idx = current_idx
+    # [0,1,2,3...]
+    round_idx_list = range(inputs)
 
     exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
               seq_length, batch_list[current_idx-1], max_epochs, 0, savefile, inputs, current_idx, 0, 0, 0, 0)
     i = 0
     while True:
-        max_epochs = random.randint(1, 3)
-        current_idx = get_train_idx(inputs)
+        round_i = i % inputs
+        if round_i == 0:
+            random.shuffle(round_idx_list)
+        max_epochs = random.randint(3, 9)
+        current_idx = round_idx_list[round_i]+1
         print('loop:', str(i), '/inf')
         exec_cmd1(data_dir, rnn_size, num_layers, seq_step, dropout,
                   seq_length, batch_list[current_idx - 1], max_epochs,
-                  last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer), get_fine_tune_end(all_layer), i+1)
+                  last_max_epochs, savefile, inputs, current_idx, last_idx, get_fine_tune_start(all_layer, fine_tune_end), get_fine_tune_end(fine_tune_end, fine_tune_end_rnd), i+1)
         exec_remove(savefile, last_idx, i, last_max_epochs)
         exec_sample(savefile, current_idx, i+1, max_epochs)
         last_idx = current_idx
